@@ -1,0 +1,9 @@
+{
+  "name": "idle-ebs",
+  "description": "Check for EBS volumes that are associated with a stopped instance, or volumes that are not attached.",
+  "runtime": "python2.7",
+  "handler": "main.lambda_handler",
+  "role": "YOUR_ROLE_ARN",
+  "memory": 128,
+  "timeout": 30
+}
