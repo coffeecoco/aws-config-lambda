@@ -3,6 +3,7 @@
   "description": "Require MFA for login users",
   "runtime": "python2.7",
   "handler": "main.lambda_handler",
+  "role": "YOUR_ROLE_ARN",
   "memory": 128,
   "timeout": 30
 }
