@@ -30,7 +30,6 @@ def evaluate_compliance(volume_id, rule_parameters):
     return {"ComplianceType": "COMPLIANT"}
 
 def lambda_handler(event, context):
-    config = boto3.client("config")
     invoking_event = json.loads(event["invokingEvent"])
     configuration_item = invoking_event["configurationItem"]
     rule_parameters = json.loads(event["ruleParameters"])
@@ -47,6 +46,7 @@ def lambda_handler(event, context):
         evaluation.update(evaluate_compliance(configuration_item["resourceId"], rule_parameters))
     print("Result", evaluation)
 
+    config = boto3.client("config")
     config.put_evaluations(
         Evaluations=[evaluation],
         ResultToken=event["resultToken"] if "resultToken" in event else "No token found."
