@@ -7,9 +7,9 @@ config = boto3.client('config')
 
 APPLICABLE_RESOURCES = ["AWS::IAM::User"]
 
-def has_login_profile(user):
+def has_login_profile(user_name):
   try:
-    iam.get_login_profile(UserName=user['UserName'])
+    iam.get_login_profile(UserName=user_name)
     return True
   except:
     return False
@@ -25,18 +25,13 @@ def evaluate_compliance(configuration_item):
   if configuration_item["resourceType"] not in APPLICABLE_RESOURCES:
     return "NOT_APPLICABLE"
 
-  resource_information = config.get_resource_config_history(
-    resourceType=configuration_item["resourceType"],
-    resourceId=configuration_item["resourceId"]
-  )
-  user_name = resource_information["configurationItems"][0]["resourceName"]
-  print('User name: {}'.format(user_name))
+  user_name = configuration_item["configuration"]["resource_name"]
 
-  user = {'UserName': user_name}
-  if has_login_profile(user) == False:
+  if has_login_profile(user_name) == False:
     return "NOT_APPLICABLE"
 
-  if has_mfa_configured(user):
+  mfa = iam.list_mfa_devices(UserName=user_name)
+  if len(mfa["MFADevices"]) > 0:
     return "COMPLIANT"
 
   return "NON_COMPLIANT"
@@ -44,8 +39,6 @@ def evaluate_compliance(configuration_item):
 def lambda_handler(event, context):
   invoking_event = json.loads(event["invokingEvent"])
   configuration_item = invoking_event["configurationItem"]
-  print("Evaluating item")
-  print(configuration_item)
   result_token = "No token found."
   if "resultToken" in event:
       result_token = event["resultToken"]
@@ -59,7 +52,6 @@ def lambda_handler(event, context):
              "OrderingTimestamp":
                configuration_item["configurationItemCaptureTime"]
           }]
-  print(evals)
   config.put_evaluations(
     Evaluations=evals,
     ResultToken=result_token
