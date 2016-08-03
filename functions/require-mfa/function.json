@@ -1,0 +1,8 @@
+{
+  "name": "require-mfa",
+  "description": "Require MFA for login users",
+  "runtime": "python2.7",
+  "handler": "main.lambda_handler",
+  "memory": 128,
+  "timeout": 30
+}
