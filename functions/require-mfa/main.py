@@ -25,7 +25,7 @@ def evaluate_compliance(configuration_item):
   if configuration_item["resourceType"] not in APPLICABLE_RESOURCES:
     return "NOT_APPLICABLE"
 
-  user_name = configuration_item["configuration"]["resource_name"]
+  user_name = configuration_item["resourceName"]
 
   if has_login_profile(user_name) == False:
     return "NOT_APPLICABLE"
