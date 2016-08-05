@@ -49,7 +49,7 @@ def lambda_handler(event, context):
     config = boto3.client("config")
     config.put_evaluations(
         Evaluations=[evaluation],
-        ResultToken=event["resultToken"] if "resultToken" in event else "No token found."
+        ResultToken=event["resultToken"]
     )
 
 

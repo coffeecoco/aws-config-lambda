@@ -3,9 +3,9 @@ from datetime import datetime, timedelta, tzinfo
 import boto3, json
 
 APPLICABLE_RESOURCES = ["AWS::IAM::User"]
+iam = boto3.client("iam")
 
 def evaluate_compliance(user_name, rule_parameters):
-    iam = boto3.client("iam")
     access_keys = iam.list_access_keys(UserName=user_name)
     active_keys = filter(lambda key: key["Status"] == "Active", access_keys["AccessKeyMetadata"])
 
@@ -28,31 +28,53 @@ def evaluate_compliance(user_name, rule_parameters):
     }
 
 def lambda_handler(event, context):
-    invoking_event = json.loads(event["invokingEvent"])
-    configuration_item = invoking_event["configurationItem"]
     rule_parameters = json.loads(event["ruleParameters"])
     if "NumDays" not in rule_parameters:
         rule_parameters["NumDays"] = "90"
-
-    print("Evaluating", configuration_item)
     print("Rule parameters", rule_parameters)
 
-    evaluation = {
-        "ComplianceResourceType": configuration_item["resourceType"],
-        "ComplianceResourceId": configuration_item["resourceId"],
-        "ComplianceType": "NOT_APPLICABLE",
-        "OrderingTimestamp": configuration_item["configurationItemCaptureTime"]
-    }
-    if configuration_item["configurationItemStatus"] != "ResourceDeleted" and configuration_item["resourceType"] in APPLICABLE_RESOURCES:
-        evaluation.update(evaluate_compliance(configuration_item["resourceName"], rule_parameters))
-    print("Result", evaluation)
+    invoking_event = json.loads(event["invokingEvent"])
+    if invoking_event["messageType"] == "ScheduledNotification":
+        # Periodic evaluation, evaluate all users
+        resp = iam.list_users()
+        for user in resp["Users"]:
+            print("Evaluating", user)
 
-    config = boto3.client("config")
-    config.put_evaluations(
-        Evaluations=[evaluation],
-        ResultToken=event["resultToken"] if "resultToken" in event else "No token found."
-    )
+            evaluation = {
+                "ComplianceResourceType": "AWS::IAM::User",
+                "ComplianceResourceId": user["UserId"],
+                "ComplianceType": "NOT_APPLICABLE",
+                "OrderingTimestamp": datetime.strptime(invoking_event["notificationCreationTime"], "%Y-%m-%dT%H:%M:%S.%fZ")
+            }
+            evaluation.update(evaluate_compliance(user["UserName"], rule_parameters))
+            print("Result", evaluation)
 
+            config = boto3.client("config")
+            config.put_evaluations(
+                Evaluations=[evaluation],
+                ResultToken=event["resultToken"]
+            )
+
+    elif invoking_event["messageType"] == "ConfigurationItemChangeNotification":
+        # Change event
+        configuration_item = invoking_event["configurationItem"]
+        print("Evaluating", configuration_item)
+
+        evaluation = {
+            "ComplianceResourceType": configuration_item["resourceType"],
+            "ComplianceResourceId": configuration_item["resourceId"],
+            "ComplianceType": "NOT_APPLICABLE",
+            "OrderingTimestamp": configuration_item["configurationItemCaptureTime"]
+        }
+        if configuration_item["configurationItemStatus"] != "ResourceDeleted" and configuration_item["resourceType"] in APPLICABLE_RESOURCES:
+            evaluation.update(evaluate_compliance(configuration_item["resourceName"], rule_parameters))
+        print("Result", evaluation)
+
+        config = boto3.client("config")
+        config.put_evaluations(
+            Evaluations=[evaluation],
+            ResultToken=event["resultToken"]
+        )
 
 
 # The code below is only for testing, to run it locally, simply run ./main.py
